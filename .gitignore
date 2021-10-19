@@ -1,1 +1,5 @@
 env/
+db.sqlite3
+/home/felipe/platzi/Django/platzigram
+local_settings.py
+platzigram/db.sqlite3
