@@ -2,15 +2,18 @@
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
-from django.views.generic.detail import DetailView
-from django.urls import reverse
+from django.urls.base import reverse, reverse_lazy
+from django.views.generic import DetailView, FormView
+from django.urls import reverse_lazy
 from django.contrib.auth.mixins import LoginRequiredMixin
 # Models
 from django.contrib.auth.models import User
+from django.views.generic.edit import UpdateView
 from posts.models import Post
+from users.models import Profile
 # Forms
-from users.forms import ProfileForm, SignupForm
-from django.views.generic import TemplateView
+from users.forms import SignupForm
+
 
 class UserDetailView(LoginRequiredMixin,DetailView):
     
@@ -27,6 +30,31 @@ class UserDetailView(LoginRequiredMixin,DetailView):
         context['posts'] = Post.objects.filter(user=user).order_by('-created')
         return context
 
+class SignupView(FormView):
+
+    template_name = 'users/signup.html'
+    form_class = SignupForm
+    success_url = reverse_lazy('users:login')
+
+    def form_valid(self, form):
+        """Save form data."""
+        form.save()
+        return super().form_valid(form)
+
+class UpdateProfileView(LoginRequiredMixin, UpdateView):
+    """UPdate profle view"""
+    template_name = 'users/update_profile.html'
+    model = Profile
+    fields = ['website', 'biography','phone_number', 'picture']
+
+    def get_object(self):
+        """return user's profile"""
+        return self.request.user.profile
+
+    def get_success_url(self):
+        """Return to user's profile"""
+        username = self.object.user.username
+        return reverse('users:detail', kwargs={'username': username})
 
 def login_view(request):
 
@@ -36,7 +64,7 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user:
             login(request, user)
-            return redirect('feed')
+            return redirect('posts:feed')
         else:
             return render(request, 'users/login.html', {'error': 'Invalid username and password'})
         
@@ -50,51 +78,3 @@ def logout_view(request):
     logout(request)
     return redirect('users:login')
 
-
-def signup(request):
-
-    if request.method == 'POST':
-        form = SignupForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('users:login')
-    else:
-        form = SignupForm()
-    
-    return render(
-        request=request,
-        template_name='users/signup.html',
-        context={'form':form}
-    )
-
-def update_profile(request):
-
-    profile = request.user.profile
-
-    if request.method == 'POST':
-        form = ProfileForm(request.POST, request.FILES)
-        if form.is_valid():
-            data = form.cleaned_data
-
-            profile.website = data['website']
-            profile.phone_number = data['phone_number']
-            profile.biography = data['biography']
-            profile.picture = data['picture']
-            profile.save()
-
-            url = reverse('users:detail',kwargs={'username': request.user.username})
-            return redirect(url)
-
-    else:
-        form = ProfileForm()
-
-    return render(
-        request=request,
-        template_name='users/update_profile.html',
-        context={
-            'profile': profile,
-            'user': request.user,
-            'form': form
-        }
-    )
-    
